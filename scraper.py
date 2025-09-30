@@ -33,47 +33,43 @@ def fetch_matches(team_id=957):
 
         # Extract date and time from first <td>
         date_time_html = str(cols[0])
-        soup = BeautifulSoup(date_time_html, 'html.parser')
-        date_time_text = soup.get_text().strip()
-        # Date is before first comma
-        date_part = date_time_text.split(',')[0].strip()
-        # Time: hour is the last number before <sup>, minute is <sup> or '00'
-        sup = soup.find('sup')
+        date_time_soup = BeautifulSoup(date_time_html, 'html.parser')
+        date_time_text = date_time_soup.get_text().strip()
+
+        date = date_time_text.split(',')[0].strip()
+        sup = date_time_soup.find('sup')
         if sup and sup.previous_sibling:
-            hour_text = sup.previous_sibling.strip()
-            minute_text = sup.get_text(strip=True)
+            # previous_sibling may include extra chars, so extract only the last number before <sup>
+            import re
+            hour_match = re.search(r'(\d{1,2})\s*$', sup.previous_sibling)
+            hour = hour_match.group(1) if hour_match else "??"
+            minute = sup.get_text(strip=True)
         else:
-            # If no <sup>, try to get last number after last comma
-            time_candidates = [p.strip() for p in date_time_text.split(',') if p.strip() and '/' not in p]
-            time_str = time_candidates[-1] if time_candidates else ''
-            if len(time_str) == 4 and time_str.isdigit():
-                hour_text = time_str[:2]
-                minute_text = time_str[2:]
-            elif len(time_str) == 2 and time_str.isdigit():
-                hour_text = time_str
-                minute_text = '00'
-            else:
-                continue
-        # Validate date and time
-        if not date_part or not hour_text.isdigit() or not minute_text.isdigit():
-            continue
-        try:
-            month, day = map(int, date_part.split("/"))
-            hour = int(hour_text)
-            minute = int(minute_text)
-            if hour < 0 or hour > 23 or minute < 0 or minute > 59:
-                continue
-            start = datetime(current_year, month, day, hour, minute)
-            end = start + timedelta(hours=1, minutes=30)
-        except Exception:
-            continue
+            hour = "??"
+            minute = "??"
 
         # Extract teams and venue
         home_team = cols[1].get_text(strip=True)
         away_team = cols[3].get_text(strip=True)
         venue = cols[4].get_text(strip=True)
 
-        print(f"Extracted: date={date_part}, time={hour:02d}:{minute:02d}, home='{home_team}', away='{away_team}', venue='{venue}'")
+        print(f"Date: {date}")
+        print(f"Time: {hour}:{minute}")
+        print(f"Home team: {home_team}")
+        print(f"Away team: {away_team}")
+        print(f"Venue: {venue}")
+
+        # If you want to keep generating the .ics file, convert hour/minute to int and build datetime
+        try:
+            month, day = map(int, date.split("/"))
+            hour_int = int(hour)
+            minute_int = int(minute)
+            if hour_int < 0 or hour_int > 23 or minute_int < 0 or minute_int > 59:
+                continue
+            start = datetime(current_year, month, day, hour_int, minute_int)
+            end = start + timedelta(hours=1, minutes=30)
+        except Exception:
+            continue
         match_info = {
             "start": start,
             "end": end,
